@@ -57,6 +57,13 @@ class NetworkAnalyzer:
             'top_ips': sorted_ips[:5]
         }
 
+    def reset(self) -> None:
+        """Reset all statistics"""
+        self.total_packets_processed = 0
+        self.total_bytes_processed = 0
+        self.protocol_count.clear()
+        self.ip_traffic.clear()
+
 
 # ─────────────────────────────────────────────
 #  Random packet generator
@@ -78,9 +85,9 @@ def generate_random_packet() -> Packet:
     src_ip = random.choice(IPS)
     dest_ip = random.choice(IPS)
 
-    # Make sure src != dest
-    if src_ip == dest_ip:
-        dest_ip = "142.250.190.46"
+    # Make sure source IP is different from destination IP
+    while src_ip == dest_ip:
+        dest_ip = random.choice(IPS)
 
     protocol = random.choice(PROTOCOLS)
     size_bytes = random.randint(40, 1500)
@@ -128,7 +135,12 @@ class NetworkAnalyzerApp(App):
 
         self.stop_btn = Button(text='Stop', background_color=(0.8, 0.2, 0.2, 1))
         self.stop_btn.bind(on_press=self.stop_analysis)
+        self.stop_btn.disabled = True
         button_layout.add_widget(self.stop_btn)
+
+        self.reset_btn = Button(text='Reset', background_color=(0.2, 0.2, 0.8, 1))
+        self.reset_btn.bind(on_press=self.reset_analysis)
+        button_layout.add_widget(self.reset_btn)
 
         main_layout.add_widget(button_layout)
 
@@ -148,6 +160,16 @@ class NetworkAnalyzerApp(App):
         self.is_running = False
         self.start_btn.disabled = False
         self.stop_btn.disabled = True
+
+    def reset_analysis(self, instance):
+        """Reset all statistics"""
+        self.is_running = False
+        self.analyzer.reset()
+        self.current_packet = None
+        self.packet_label.text = '[i]Waiting for packets...[/i]'
+        self.start_btn.disabled = False
+        self.stop_btn.disabled = True
+        self.refresh_dashboard()
 
     def update_dashboard(self, dt):
         """Update dashboard with new packet data"""
@@ -184,14 +206,20 @@ class NetworkAnalyzerApp(App):
 
         # Protocol distribution
         protocol_text = '[b]🔄 Protocols[/b]\n'
-        for proto, count in data['protocols'].items():
-            protocol_text += f'{proto}: {count}\n'
+        if data['protocols']:
+            for proto, count in data['protocols'].items():
+                protocol_text += f'{proto}: {count}\n'
+        else:
+            protocol_text += 'No data\n'
         self.dashboard_layout.add_widget(Label(text=protocol_text, markup=True, size_hint_y=None, height=100))
 
         # Top IPs
         ip_text = '[b]🌐 Top IPs[/b]\n'
-        for ip, bytes_sent in data['top_ips']:
-            ip_text += f'{ip}: {bytes_sent/1024:.2f} KB\n'
+        if data['top_ips']:
+            for ip, bytes_sent in data['top_ips']:
+                ip_text += f'{ip}: {bytes_sent/1024:.2f} KB\n'
+        else:
+            ip_text += 'No data\n'
         self.dashboard_layout.add_widget(Label(text=ip_text, markup=True, size_hint_y=None, height=120))
 
 
